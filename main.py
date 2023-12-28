@@ -1,14 +1,13 @@
 import asyncio
-import logging
+
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters.command import Command
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, Message
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+from vkparser import VkWallParser, Post
 from config import Config
 from db import DB, User
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from vkparser import VkWallParser, Post
-
-logging.basicConfig(level=logging.INFO)
 
 
 class UserRouter(Router):
@@ -27,16 +26,17 @@ class UserRouter(Router):
 
     async def get_posts_handler(self, message: Message):
         user = User(message.from_user.username, message.from_user.id)
+
         if not self.db.check_exists(user):
             return
 
         posts = self.bot.parser.get_walls()
-
         for post in posts:
             await self.bot.send_post_message(user, post)
 
     async def subscribe_handler(self, message: Message):
         user = User(message.from_user.username, message.from_user.id)
+
         if self.db.check_exists(user):
             await message.reply(self.config.texts["already_subscribe"])
         else:
@@ -49,6 +49,7 @@ class UserRouter(Router):
 
     async def unsubscribe_handler(self, message: Message):
         user = User(message.from_user.username, message.from_user.id)
+
         if self.db.check_exists(user):
             self.db.delete_user(
                 User(message.from_user.first_name, message.from_user.id)
@@ -59,6 +60,7 @@ class UserRouter(Router):
 
     async def user_add_handler(self, user):
         admin = self.db.get_admins()[0]
+
         await self.bot.send_message(
             admin.tg_id,
             text=self.config.texts["request_admin_from_bot"] + user.name,
@@ -119,6 +121,7 @@ class AdminRouter(Router):
             return
 
         user = self.not_add_users.pop(0)
+
         await self.bot.send_photo(
             user.tg_id,
             photo=self.config.refusal_photo,
@@ -130,15 +133,16 @@ class FortBot(Bot):
     def __init__(self, conf):
         super().__init__(token=conf.token)
         self.dispatcher = Dispatcher()
-        self.config = conf
+        self.parser = VkWallParser(conf)
         self.db = DB()
+        self.config = conf
+
         self.not_add_users = []
         self.last_post = Post()
-        self.db.add_user(
-            User(self.config.admin_username, self.config.admin_tg_id, True)
-        )
+
+        self.db.add_user(self.config.get_admin)
+
         self.init_handles()
-        self.parser = VkWallParser(conf)
 
     def init_handles(self):
         self.dispatcher.message.register(self.start_handler, Command("start"))

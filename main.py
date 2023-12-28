@@ -21,40 +21,48 @@ class UserRouter(Router):
         self.init_handlers()
 
     def init_handlers(self):
-        self.message.register(self.subscribe_handler, F.text.lower() == "подписаться")
-        self.message.register(self.unsubscribe_handler, F.text.lower() == "отписаться")
+        self.message.register(self.subscribe_handler, F.data == "subscribe")
+        self.message.register(self.unsubscribe_handler, F.data == "unsubscribe")
+        self.message.register(self.get_posts_handler, F.data == "get_posts")
+
+    async def get_posts_handler(self, message: Message):
+        user = User(message.from_user.username, message.from_user.id)
+        if not self.db.check_exists(user):
+            return
+
+        posts = self.bot.parser.get_walls()
+
+        for post in posts:
+            await self.bot.send_post_message(user, post)
 
     async def subscribe_handler(self, message: Message):
         user = User(message.from_user.username, message.from_user.id)
         if self.db.check_exists(user):
-            posts = self.bot.parser.get_walls()
-            await message.reply(self.config.texts['already_subscribe'])
-            for post in posts:
-                await self.bot.send_post_message(user, post)
+            await message.reply(self.config.texts["already_subscribe"])
         else:
             self.not_add_users.append(user)
-            await message.answer_photo(photo=self.config.expectation_photo,
-                                       caption=self.config.texts['request_admin_from_user'])
+            await message.answer_photo(
+                photo=self.config.expectation_photo,
+                caption=self.config.texts["request_admin_from_user"],
+            )
             await self.user_add_handler(user)
 
     async def unsubscribe_handler(self, message: Message):
         user = User(message.from_user.username, message.from_user.id)
         if self.db.check_exists(user):
-            self.db.delete_user(User(message.from_user.first_name, message.from_user.id))
-            await message.reply(self.config.texts['unsubscribe'])
+            self.db.delete_user(
+                User(message.from_user.first_name, message.from_user.id)
+            )
+            await message.reply(self.config.texts["unsubscribe"])
         else:
-            await message.reply(self.config.texts['not_subscribe_yet'])
+            await message.reply(self.config.texts["not_subscribe_yet"])
 
     async def user_add_handler(self, user):
         admin = self.db.get_admins()[0]
-        kb = [
-            [KeyboardButton(text="Добавить")],
-            [KeyboardButton(text="Не добавлять")]
-        ]
-        keyboard = ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-        await self.bot.send_message(admin.tg_id,
-                                    text=self.config.texts['request_admin_from_bot'] + user.name,
-                                    reply_markup=keyboard)
+        await self.bot.send_message(
+            admin.tg_id,
+            text=self.config.texts["request_admin_from_bot"] + user.name,
+        )
 
 
 class AdminRouter(Router):
@@ -67,8 +75,8 @@ class AdminRouter(Router):
         self.init_handlers()
 
     def init_handlers(self):
-        self.message.register(self.admin_add_user, F.text.lower() == "добавить")
-        self.message.register(self.admin_del_user, F.text.lower() == "не добавлять")
+        self.message.register(self.admin_add_user, F.data == "add_user")
+        self.message.register(self.admin_del_user, F.data == "del_user")
 
     async def admin_add_user(self, message: Message):
         if len(self.not_add_users) == 0:
@@ -77,19 +85,45 @@ class AdminRouter(Router):
         user = self.not_add_users.pop(0)
         self.db.add_user(user)
 
-        posts = self.bot.parser.get_walls()
+        kb = [
+            [
+                KeyboardButton(
+                    text=self.config.texts["btn_subscribe"], callback_data="subscribe"
+                )
+            ],
+            [
+                KeyboardButton(
+                    text=self.config.texts["btn_unsubscribe"],
+                    callback_data="unsubscribe",
+                )
+            ],
+            [
+                keyboardButton(
+                    text=self.config.texts["btn_get_posts"], callback_data="get_posts"
+                )
+            ],
+            [
+                KeyboardButton(
+                    text=self.config.texts["btn_get_admin"], callback_data="get_admin"
+                )
+            ],
+        ]
 
-        for post in posts:
-            await self.bot.send_post_message(user, post)
+        keyboard = ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+        await self.bot.send_message(
+            user.tg_id, text=self.config.text["subscribe"], reply_markup=keyboard
+        )
 
     async def admin_del_user(self, message: Message):
         if len(self.not_add_users) == 0:
             return
 
         user = self.not_add_users.pop(0)
-        await self.bot.send_photo(user.tg_id,
-                                  photo=self.config.refusal_photo,
-                                  caption=self.config.texts['refusal'])
+        await self.bot.send_photo(
+            user.tg_id,
+            photo=self.config.refusal_photo,
+            caption=self.config.texts["refusal"],
+        )
 
 
 class FortBot(Bot):
@@ -100,19 +134,29 @@ class FortBot(Bot):
         self.db = DB()
         self.not_add_users = []
         self.last_post = Post()
-        self.db.add_user(User(self.config.admin_username, self.config.admin_tg_id, True))
+        self.db.add_user(
+            User(self.config.admin_username, self.config.admin_tg_id, True)
+        )
         self.init_handles()
         self.parser = VkWallParser(conf)
 
     def init_handles(self):
         self.dispatcher.message.register(self.start_handler, Command("start"))
-        self.dispatcher.include_router(UserRouter(self.config, self.db, self.not_add_users, self))
-        self.dispatcher.include_router(AdminRouter(self.config, self.db, self.not_add_users, self))
+        self.dispatcher.include_router(
+            UserRouter(self.config, self.db, self.not_add_users, self)
+        )
+        self.dispatcher.include_router(
+            AdminRouter(self.config, self.db, self.not_add_users, self)
+        )
 
     async def check_new_post(self):
         post = self.parser.get_past_wall()
 
-        if post.post_id == self.last_post.post_id or post.text == '' or post.photo == '':
+        if (
+            post.post_id == self.last_post.post_id
+            or post.text == ""
+            or post.photo == ""
+        ):
             return
 
         self.last_post = post
@@ -121,44 +165,90 @@ class FortBot(Bot):
             await self.send_post_message(user, post)
 
     async def send_post_message(self, user, post):
-        if post.text == '':
+        if post.text == "":
             return
 
-        elif post.photo == '':
+        elif post.photo == "":
             count = int(len(post.text) / 1000) + 1
             for i in range(count):
-                await self.send_message(user.tg_id, text=post.text[i * 1000:(i+1) * 1000])
+                await self.send_message(
+                    user.tg_id, text=post.text[i * 1000 : (i + 1) * 1000]
+                )
         else:
             count = int(len(post.text) / 1000) + 1
             for i in range(count):
                 if i == count - 1:
-                    await self.send_photo(user.tg_id,
-                                          photo=post.photo,
-                                          caption=post.text[i * 1000:(i+1) * 1000])
+                    await self.send_photo(
+                        user.tg_id,
+                        photo=post.photo,
+                        caption=post.text[i * 1000 : (i + 1) * 1000],
+                    )
                     break
 
-                await self.send_message(user.tg_id, text=post.text[i * 1000:(i+1) * 1000])
+                await self.send_message(
+                    user.tg_id, text=post.text[i * 1000 : (i + 1) * 1000]
+                )
 
     async def start(self):
         await self.dispatcher.start_polling(self)
 
     async def start_handler(self, message: Message):
+        user = User(message.from_user.username, message.from_user.id)
+
         kb = [
-            [KeyboardButton(text="Подписаться")],
-            [KeyboardButton(text="Отписаться")]
+            [
+                KeyboardButton(
+                    text=self.config.texts["btn_subscribe"], callback_data="subscribe"
+                )
+            ],
+            [
+                KeyboardButton(
+                    text=self.config.texts["btn_unsubscribe"],
+                    callback_data="unsubscribe",
+                )
+            ],
         ]
+
+        if self.db.check_admin(user):
+            kb.append(
+                [
+                    keyboardButton(
+                        text=self.config.texts["btn_get_posts"],
+                        callback_data="get_posts",
+                    )
+                ]
+            )
+            kb.append(
+                [
+                    KeyboardButton(
+                        text=self.config.texts["btn_add"], callback_data="add_user"
+                    )
+                ]
+            )
+            kb.append(
+                [
+                    KeyboardButton(
+                        text=self.config.texts["btn_del"], callback_data="del_user"
+                    )
+                ]
+            )
+
         keyboard = ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-        await message.answer_photo(photo=self.config.greetings_photo,
-                                   reply_markup=keyboard,
-                                   caption=self.config.texts['greetings'])
+        await message.answer_photo(
+            photo=self.config.greetings_photo,
+            reply_markup=keyboard,
+            caption=self.config.texts["greetings"],
+        )
 
 
 async def main():
+    scheduler = AsyncIOScheduler()
     conf = Config()
     bot = FortBot(conf)
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(bot.check_new_post, 'interval', seconds=60 * 15)
+
+    scheduler.add_job(bot.check_new_post, "interval", seconds=60 * 5)
     scheduler.start()
+
     await bot.start()
 
 

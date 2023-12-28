@@ -151,6 +151,18 @@ class DB:
 
         return admins
 
+    def set_admin(self, user):
+        query = """
+                UPDATE USERS
+                SET admin=TRUE
+                WHERE name=%s AND tg_id=%s
+                """
+        try:
+            self.cursor.execute(query, (user.name, user.tg_id))
+            self.connection.commit()
+        except (Exception, Error) as error:
+            log(error)
+
 
 def log(error):
     print("postgreSQL error: ", error)

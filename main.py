@@ -79,8 +79,16 @@ class AdminRouter(Router):
         self.init_handlers()
 
     def init_handlers(self):
+        self.message.register(self.set_user_admin, F.data == "get_admin")
         self.message.register(self.admin_add_user, F.data == "add_user")
         self.message.register(self.admin_del_user, F.data == "del_user")
+
+    async def set_user_admin(self, message: Message):
+        user = User(message.from_user.username, message.from_user.id)
+        if not self.db.check_exists(user) or self.db.check_admin(user):
+            return
+
+        self.db.set_user_admin(user)
 
     async def admin_add_user(self, message: Message):
         if len(self.not_add_users) == 0:

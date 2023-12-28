@@ -5,9 +5,11 @@ from aiogram.filters.command import Command
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, Message
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from vkparser import VkWallParser, Post
+from vkparser import VkWallParser
 from config import Config
-from db import DB, User
+from user import User
+from post import Post
+from db import DB
 
 
 class UserRouter(Router):

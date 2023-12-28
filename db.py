@@ -1,13 +1,7 @@
 import psycopg2
 from psycopg2 import Error
+from user import User
 import os
-
-
-class User:
-    def __init__(self, name, tg_id, admin=False):
-        self.name = name
-        self.tg_id = tg_id
-        self.admin = admin
 
 
 class DB:

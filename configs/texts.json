@@ -8,12 +8,10 @@
   "subscribe": "Вы подписаны",
   "unsubscribe": "Вы отписаны",
 
-
   "btn_subscribe": "Подписаться",
   "btn_unsubscribe": "Отписаться",
   "btn_get_admin": "Хочу стать админом",
   "btn_get_posts": "Хочу узнать новости",
-  "btn add": "Добавить",
+  "btn_add": "Добавить",
   "btn_del": "Не добавлять"
-
 }

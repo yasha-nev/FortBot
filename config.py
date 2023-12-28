@@ -1,6 +1,7 @@
 import json
 import sys
 from aiogram.types import FSInputFile
+from user import User
 
 
 class Config:
@@ -25,7 +26,7 @@ class Config:
         self.read_photo()
 
     def get_admin(self):
-        return User(self.config.admin_username, self.config.admin_tg_id, True)
+        return User(self.admin_username, self.admin_tg_id, True)
 
     def read_config(self):
         try:

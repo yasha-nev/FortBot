@@ -122,9 +122,7 @@ class DB:
                             SELECT * FROM USERS WHERE name=%s AND tg_id=%s AND admin=TRUE
                             """
         try:
-            self.cursor.execute(
-                select_user_query, (user.name, str(user.tg_id), user.admin)
-            )
+            self.cursor.execute(select_user_query, (user.name, str(user.tg_id)))
             records = self.cursor.fetchall()
         except (Exception, Error) as error:
             log(error)
@@ -158,7 +156,7 @@ class DB:
                 WHERE name=%s AND tg_id=%s
                 """
         try:
-            self.cursor.execute(query, (user.name, user.tg_id))
+            self.cursor.execute(query, (user.name, str(user.tg_id)))
             self.connection.commit()
         except (Exception, Error) as error:
             log(error)

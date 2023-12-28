@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters.command import Command
@@ -11,6 +12,8 @@ from user import User
 from post import Post
 from db import DB
 
+logging.basicConfig(level=logging.INFO)
+
 
 class UserRouter(Router):
     def __init__(self, config, db, not_users_list, bot):
@@ -22,9 +25,15 @@ class UserRouter(Router):
         self.init_handlers()
 
     def init_handlers(self):
-        self.message.register(self.subscribe_handler, F.data == "subscribe")
-        self.message.register(self.unsubscribe_handler, F.data == "unsubscribe")
-        self.message.register(self.get_posts_handler, F.data == "get_posts")
+        self.message.register(
+            self.subscribe_handler, F.text == self.config.texts["btn_subscribe"]
+        )
+        self.message.register(
+            self.unsubscribe_handler, F.text == self.config.texts["btn_unsubscribe"]
+        )
+        self.message.register(
+            self.get_posts_handler, F.text == self.config.texts["btn_get_posts"]
+        )
 
     async def get_posts_handler(self, message: Message):
         user = User(message.from_user.username, message.from_user.id)
@@ -53,9 +62,7 @@ class UserRouter(Router):
         user = User(message.from_user.username, message.from_user.id)
 
         if self.db.check_exists(user):
-            self.db.delete_user(
-                User(message.from_user.first_name, message.from_user.id)
-            )
+            self.db.delete_user(user)
             await message.reply(self.config.texts["unsubscribe"])
         else:
             await message.reply(self.config.texts["not_subscribe_yet"])
@@ -79,23 +86,31 @@ class AdminRouter(Router):
         self.init_handlers()
 
     def init_handlers(self):
-        self.message.register(self.set_user_admin, F.data == "get_admin")
-        self.message.register(self.admin_add_user, F.data == "add_user")
-        self.message.register(self.admin_del_user, F.data == "del_user")
+        self.message.register(
+            self.set_user_admin, F.text == self.config.texts["btn_get_admin"]
+        )
+        self.message.register(
+            self.admin_add_user, F.text == self.config.texts["btn_add"]
+        )
+        self.message.register(
+            self.admin_del_user, F.text == self.config.texts["btn_del"]
+        )
 
     async def set_user_admin(self, message: Message):
         user = User(message.from_user.username, message.from_user.id)
         if not self.db.check_exists(user) or self.db.check_admin(user):
             return
 
-        self.db.set_user_admin(user)
+        self.db.set_admin(user)
 
     async def admin_add_user(self, message: Message):
+        print("work")
         if len(self.not_add_users) == 0:
             return
 
         user = self.not_add_users.pop(0)
         self.db.add_user(user)
+        print(user.name)
 
         kb = [
             [
@@ -110,7 +125,7 @@ class AdminRouter(Router):
                 )
             ],
             [
-                keyboardButton(
+                KeyboardButton(
                     text=self.config.texts["btn_get_posts"], callback_data="get_posts"
                 )
             ],
@@ -123,7 +138,7 @@ class AdminRouter(Router):
 
         keyboard = ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
         await self.bot.send_message(
-            user.tg_id, text=self.config.text["subscribe"], reply_markup=keyboard
+            user.tg_id, text=self.config.texts["subscribe"], reply_markup=keyboard
         )
 
     async def admin_del_user(self, message: Message):
@@ -150,7 +165,7 @@ class FortBot(Bot):
         self.not_add_users = []
         self.last_post = Post()
 
-        self.db.add_user(self.config.get_admin)
+        self.db.add_user(self.config.get_admin())
 
         self.init_handles()
 
@@ -208,7 +223,6 @@ class FortBot(Bot):
 
     async def start_handler(self, message: Message):
         user = User(message.from_user.username, message.from_user.id)
-
         kb = [
             [
                 KeyboardButton(
@@ -226,7 +240,7 @@ class FortBot(Bot):
         if self.db.check_admin(user):
             kb.append(
                 [
-                    keyboardButton(
+                    KeyboardButton(
                         text=self.config.texts["btn_get_posts"],
                         callback_data="get_posts",
                     )

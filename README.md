@@ -32,7 +32,7 @@
 
 3. **Запустить проект через команду:**
     ```
-    $ docker-compose up -- build
+    $ docker-compose up --build
     ```
 
 4. **И воуля! Наш бот активен**
